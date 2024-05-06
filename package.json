@@ -1,0 +1,16 @@
+{
+  "name": "@webreflection/bluetooth-json",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./bt.json",
+  "module": "./bt.json",
+  "exports": {
+    ".": "./bt.json"
+  },
+  "devDependencies": {
+    "yaml": "^2.4.2"
+  },
+  "scripts": {
+    "build": "rm -rf json && node json.js"
+  }
+}
