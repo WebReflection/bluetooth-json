@@ -4,8 +4,7 @@ import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'f
 import { join } from 'path';
 
 const { hasOwn, keys } = Object;
-
-const stringify = what => JSON.stringify(what, null, '  ');
+const { stringify } = JSON;
 
 const convert = (source, dest, json) => {
   for (const file of readdirSync(source)) {
@@ -28,9 +27,7 @@ const convert = (source, dest, json) => {
       }
       writeFileSync(
         destPath.replace(/\.yaml$/, '.json'),
-        stringify(
-          target[keys[last]] = value
-        )
+        stringify(target[keys[last]] = value)
       );
     }
   }
