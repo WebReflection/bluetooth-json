@@ -4,7 +4,9 @@ import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'f
 import { join } from 'path';
 
 const { hasOwn, keys } = Object;
+
 const { stringify } = JSON;
+// const stringify = (what, how = null) => JSON.stringify(what, how, '  ');
 
 const convert = (source, dest, json) => {
   for (const file of readdirSync(source)) {
@@ -18,8 +20,12 @@ const convert = (source, dest, json) => {
     }
     else if (sourcePath.endsWith('.yaml')) {
       const value = parse(readFileSync(sourcePath).toString());
-      const keys = key.split('.'), last = keys.length - 1;
-      let target = json;
+      let target = json, keys = key.split('.'), last = keys.length - 1;
+      // avoid thing1.2etc to throw
+      while (/^\d/.test(keys[last])) {
+        last--;
+        keys[last] += `.${keys[last + 1]}`;
+      }
       for (let k, i = 0; i < last; i++) {
         k = keys[i];
         if (!hasOwn(target, k)) target[k] = {};
@@ -43,10 +49,24 @@ const reduce = (json, name) => {
   }
 };
 
-// cleanup assigned_numbers
+// cleanup company_identifiers
 const { company_identifiers } = json.assigned_numbers;
 reduce(company_identifiers, 'company_identifiers');
-json.assigned_numbers = company_identifiers.company_identifiers;
+delete json.assigned_numbers.company_identifiers;
+
+for (const key of keys(json.assigned_numbers.core)) {
+  const value = json.assigned_numbers.core[key];
+  const nested = keys(value);
+  if (nested.length === 1 && nested[0] === key)
+    json.assigned_numbers.core[key] = value[key];
+}
+
+for (const key of keys(json.assigned_numbers.uuids)) {
+  const value = json.assigned_numbers.uuids[key];
+  const nested = keys(value);
+  if (nested.length === 1 && nested[0] === 'uuids')
+    json.assigned_numbers.uuids[key] = value.uuids;
+}
 
 // cleanup dp
 json.dp.properties = json.dp.properties.property;
@@ -64,4 +84,24 @@ json.dp.ids = ids;
 json.gss = json.gss.characteristic;
 reduce(json.gss, 'characteristic');
 
-writeFileSync(join('.', 'bt.json'), stringify(json));
+const identifiers = [];
+
+const cleanup = (k, v) => {
+  if (k === 'description') return;
+  if (typeof v === 'string') {
+    if (/^\d+$/.test(v) || /^0x[0-9A-F]+$/.test(v))
+      return Number(v);
+    if (/^org\.bluetooth\.([^.]+?)\./.test(v)) {
+      const { $1: name } = RegExp;
+      if (name === 'characteristic') return;
+      let index = identifiers.indexOf(name);
+      if (index < 0) index = identifiers.push(name) - 1;
+      return [index, v.replace(`org.bluetooth.${name}.`, '')];
+    }
+  }
+  return v;
+};
+
+json['org.bluetooth'] = identifiers;
+
+writeFileSync(join('.', 'bt.json'), stringify(json, cleanup));
